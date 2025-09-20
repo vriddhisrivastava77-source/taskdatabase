@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Task Manager — Mini Project</title>
+  <style>
+    :root{
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #6366f1;
+      --danger: #ef4444;
+      --success: #10b981;
+      --shadow: 0 6px 20px rgba(16,24,40,0.08);
+      --radius: 12px;
+    }
+    [data-theme='dark']{
+      --bg: #0b1220;
+      --card: #0f1724;
+      --text: #e6eef6;
+      --muted: #94a3b8;
+      --accent: #7c5cff;
+      --danger: #fb7185;
+      --success: #34d399;
+      --shadow: 0 10px 30px rgba(2,6,23,0.6);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      background:linear-gradient(180deg,var(--bg), #e9eefc00);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      padding:32px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .app{
+      width:100%;
+      max-width:920px;
+      background:var(--card);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:20px;
+      transition:all .25s ease;
+    }
+
+    header{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:12px;
+    }
+    h1{font-size:18px;margin:0}
+
+    .controls{display:flex;gap:8px;align-items:center}
+
+    .btn{background:transparent;border:1px solid rgba(0,0,0,0.06);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn:hover{transform:translateY(-2px)}
+    .btn:active{transform:translateY(0)}
+
+    .add-row{display:flex;gap:8px;margin:14px 0}
+    .input, .select, .search{
+      padding:12px 14px;border-radius:12px;border:1px solid rgba(0,0,0,0.06);outline:none;font-size:14px;width:100%;
+      background:transparent;color:var(--text)
+    }
+    .select{max-width:150px}
+    .add-btn{background:var(--accent);color:white;border:none}
+
+    .topbar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+
+    .filters{display:flex;gap:6px}
+    .filters .btn{background:transparent;border:1px solid rgba(100,100,120,0.06)}
+    .filters .btn.active{background:rgba(99,102,241,0.12);border-color:transparent}
+
+    .list{margin-top:10px}
+
+    .task{
+      display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;margin-bottom:10px;transition:transform .12s ease, background .12s ease;cursor:grab;
+      border:1px solid rgba(0,0,0,0.03);
+    }
+    .task.dragging{opacity:.6;transform:scale(.995);cursor:grabbing}
+
+    .task .left{display:flex;align-items:center;gap:12px;flex:1}
+    .task .left input[type=checkbox]{width:18px;height:18px}
+    .task .content{display:flex;flex-direction:column}
+    .task .title{font-weight:600}
+    .task .title.done{text-decoration:line-through;opacity:.6}
+    .task .meta{font-size:12px;color:var(--muted)}
+
+    .tag{padding:5px 8px;border-radius:10px;font-size:12px;font-weight:700}
+    .tag.low{background:rgba(34,197,94,0.12);color:var(--success)}
+    .tag.med{background:rgba(249,115,22,0.08);color:#f97316}
+    .tag.high{background:rgba(239,68,68,0.08);color:var(--danger)}
+
+    .actions{display:flex;gap:8px}
+    .icon-btn{background:transparent;border:none;padding:6px;border-radius:8px;cursor:pointer}
+    .icon-btn:hover{background:rgba(0,0,0,0.04)}
+
+    .muted{color:var(--muted)}
+
+    .footer{display:flex;align-items:center;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:1px dashed rgba(0,0,0,0.04)}
+
+    /* small screens */
+    @media (max-width:640px){
+      body{padding:16px}
+      .app{padding:14px}
+      .add-row{flex-direction:column}
+      .topbar{flex-direction:column;align-items:stretch}
+      .controls{width:100%;justify-content:space-between}
+      .filters{flex-wrap:wrap}
+    }
+
+    /* simple transitions */
+    .fade-in{animation:fadeIn .18s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+    /* editing input */
+    .edit-input{padding:8px 10px;border-radius:8px;border:1px dashed rgba(0,0,0,0.08);width:100%}
+    .search{max-width:220px}
+
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div>
+        <h1>Task Manager</h1>
+        <div class="muted" style="font-size:13px;margin-top:6px">A mini task manager — persistent, filterable, editable, with drag & drop and dark mode.</div>
+      </div>
+      <div class="controls">
+        <button class="btn" id="darkToggle" title="Toggle dark mode">🌙</button>
+        <button class="btn" id="clearCompleted">Clear Completed</button>
+      </div>
+    </header>
+
+    <div class="add-row">
+      <input id="taskInput" class="input" placeholder="Add new task... (press Enter)" aria-label="New task">
+      <select id="priority" class="select" title="Priority">
+        <option value="med">Medium Priority</option>
+        <option value="low">Low Priority</option>
+        <option value="high">High Priority</option>
+      </select>
+      <button id="addBtn" class="btn add-btn">Add Task</button>
+    </div>
+
+    <div class="topbar">
+      <div class="filters" role="tablist" aria-label="Filters">
+        <button class="btn active" data-filter="all">All</button>
+        <button class="btn" data-filter="active">Active</button>
+        <button class="btn" data-filter="completed">Completed</button>
+      </div>
+
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+        <input id="search" class="search" placeholder="Search tasks..." aria-label="Search tasks">
+        <div class="muted">Total: <span id="count">0</span></div>
+      </div>
+    </div>
+
+    <main>
+      <div id="list" class="list" aria-live="polite"></div>
+    </main>
+
+    <div class="footer">
+      <div class="muted">Tip: Double-click a task title to edit. Drag tasks to reorder.</div>
+      <div class="muted">Made for assignment • LocalStorage saved</div>
+    </div>
+  </div>
+
+  <script>
+    // Simple Task Manager
+    const KEY = 'taskManager.tasks.v1';
+    const THEME_KEY = 'taskManager.theme.v1';
+
+    // state
+    let tasks = [];
+    let filter = 'all';
+    let draggedId = null;
+
+    // elements
+    const listEl = document.getElementById('list');
+    const inputEl = document.getElementById('taskInput');
+    const addBtn = document.getElementById('addBtn');
+    const countEl = document.getElementById('count');
+    const filters = document.querySelectorAll('[data-filter]');
+    const searchEl = document.getElementById('search');
+    const clearCompletedBtn = document.getElementById('clearCompleted');
+    const darkToggle = document.getElementById('darkToggle');
+    const prioritySel = document.getElementById('priority');
+
+    // utilities
+    const uid = ()=>Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    const save = ()=>localStorage.setItem(KEY, JSON.stringify(tasks));
+    const load = ()=>{
+      try{
+        const raw = localStorage.getItem(KEY);
+        tasks = raw ? JSON.parse(raw) : [];
+      }catch(e){tasks=[]}
+    }
+
+    // theme
+    function loadTheme(){
+      const saved = localStorage.getItem(THEME_KEY);
+      if(saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+    }
+    function toggleTheme(){
+      if(document.documentElement.getAttribute('data-theme') === 'dark'){
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.removeItem(THEME_KEY);
+        darkToggle.textContent = '🌙';
+      }else{
+        document.documentElement.setAttribute('data-theme','dark');
+        localStorage.setItem(THEME_KEY,'dark');
+        darkToggle.textContent = '☀️';
+      }
+    }
+
+    // render
+    function render(){
+      const q = (searchEl.value || '').trim().toLowerCase();
+      let visible = tasks.slice();
+      if(filter === 'active') visible = visible.filter(t => !t.done);
+      if(filter === 'completed') visible = visible.filter(t => t.done);
+      if(q) visible = visible.filter(t => t.text.toLowerCase().includes(q));
+
+      // sort: by done then priority then order index
+      const priorityWeight = {high: -2, med: 0, low: 2};
+      visible.sort((a,b)=> (a.order - b.order));
+
+      listEl.innerHTML = '';
+      visible.forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'task fade-in';
+        el.draggable = true;
+        el.dataset.id = t.id;
+
+        el.innerHTML = `
+          <div class="left">
+            <input type="checkbox" ${t.done? 'checked' : ''} aria-label="Mark done">
+            <div class="content" style="min-width:0">
+              <div style="display:flex;gap:8px;align-items:center">
+                <div class="title ${t.done? 'done' : ''}" data-id="${t.id}">${escapeHtml(t.text)}</div>
+                <div class="tag ${t.priority}">${t.priority.toUpperCase()}</div>
+              </div>
+              <div class="meta muted">${new Date(t.created).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="icon-btn edit" title="Edit">✏️</button>
+            <button class="icon-btn delete" title="Delete">🗑️</button>
+          </div>
+        `;
+
+        // events
+        const checkbox = el.querySelector('input[type=checkbox]');
+        checkbox.addEventListener('change', ()=>{ toggleDone(t.id); });
+
+        el.querySelector('.delete').addEventListener('click', ()=>{ deleteTask(t.id); });
+        el.querySelector('.edit').addEventListener('click', ()=>{ startEdit(t.id, el); });
+
+        // double click title to edit
+        el.querySelector('.title').addEventListener('dblclick', ()=> startEdit(t.id, el));
+
+        // drag & drop handlers
+        el.addEventListener('dragstart', e=>{
+          draggedId = t.id;
+          el.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', ()=>{ draggedId = null; el.classList.remove('dragging'); });
+
+        el.addEventListener('dragover', e=>{
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          el.style.transform = 'scale(.998)';
+        });
+        el.addEventListener('dragleave', ()=>{ el.style.transform = ''; });
+        el.addEventListener('drop', e=>{
+          e.preventDefault();
+          el.style.transform = '';
+          if(!draggedId || draggedId === t.id) return;
+          reorder(draggedId, t.id);
+        });
+
+        listEl.appendChild(el);
+      });
+
+      countEl.textContent = tasks.length;
+      save();
+    }
+
+    function escapeHtml(str){
+      return str.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    }
+
+    // CRUD
+    function addTask(text, priority='med'){
+      if(!text || !text.trim()) return;
+      const baseOrder = tasks.length ? Math.max(...tasks.map(t=>t.order)) + 1 : 0;
+      const t = {id:uid(), text:text.trim(), done:false, priority:priority, created: Date.now(), order: baseOrder};
+      tasks.push(t);
+      render();
+      inputEl.value = '';
+      prioritySel.value = 'med';
+      inputEl.focus();
+    }
+
+    function toggleDone(id){
+      const t = tasks.find(x=>x.id===id); if(!t) return;
+      t.done = !t.done; render();
+    }
+
+    function deleteTask(id){
+      tasks = tasks.filter(x=>x.id!==id);
+      render();
+    }
+
+    function startEdit(id, containerEl){
+      const t = tasks.find(x=>x.id===id); if(!t) return;
+      const titleEl = containerEl.querySelector('.title');
+      const input = document.createElement('input');
+      input.value = t.text;
+      input.className = 'edit-input';
+      titleEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      function commit(){
+        if(input.value.trim()) t.text = input.value.trim();
+        render();
+      }
+      function cancel(){ render(); }
+
+      input.addEventListener('keydown', e=>{
+        if(e.key === 'Enter'){ commit(); }
+        if(e.key === 'Escape'){ cancel(); }
+      });
+      input.addEventListener('blur', commit);
+    }
+
+    function clearCompleted(){
+      tasks = tasks.filter(t=>!t.done);
+      render();
+    }
+
+    function reorder(dragId, dropId){
+      const dragIdx = tasks.findIndex(t=>t.id===dragId);
+      const dropIdx = tasks.findIndex(t=>t.id===dropId);
+      if(dragIdx<0 || dropIdx<0) return;
+      const [m] = tasks.splice(dragIdx,1);
+      tasks.splice(dropIdx,0,m);
+      // reassign order
+      tasks.forEach((t,i)=>t.order = i);
+      render();
+    }
+
+    // wire ui
+    addBtn.addEventListener('click', ()=> addTask(inputEl.value, prioritySel.value));
+    inputEl.addEventListener('keydown', e=>{ if(e.key==='Enter') addTask(inputEl.value, prioritySel.value); });
+
+    filters.forEach(b=> b.addEventListener('click', ()=>{
+      filters.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      filter = b.dataset.filter;
+      render();
+    }));
+
+    searchEl.addEventListener('input', ()=> render());
+    clearCompletedBtn.addEventListener('click', ()=>{ if(confirm('Remove all completed tasks?')) clearCompleted(); });
+    darkToggle.addEventListener('click', toggleTheme);
+
+    // initialise
+    load();
+    loadTheme();
+    // ensure order property
+    tasks.forEach((t,i)=>{ if(typeof t.order === 'undefined') t.order = i; });
+    render();
+
+    // expose for debug (optional)
+    window._tasks = tasks;
+
+    // accessibility: keyboard reorder (optional)
+    listEl.addEventListener('keydown', e=>{
+      const focused = document.activeElement.closest && document.activeElement.closest('.task');
+      if(!focused) return;
+      const id = focused.dataset.id;
+      const idx = tasks.findIndex(t=>t.id===id);
+      if(e.key === 'ArrowUp' && idx>0){ reorder(id, tasks[idx-1].id); }
+      if(e.key === 'ArrowDown' && idx < tasks.length-1){ reorder(id, tasks[idx+1].id); }
+    });
+
+  </script>
+</body>
+</html>
